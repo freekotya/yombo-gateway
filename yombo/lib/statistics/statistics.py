@@ -114,6 +114,14 @@ from .buckets_manager import BucketsManager
 logger = get_logger('library.statistics')
 
 
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
 class Statistics(YomboLibrary):
     """
     Library to process all the statistics. Allows long running data to be collectd on devices regardless of
@@ -928,3 +936,21 @@ class Statistics(YomboLibrary):
 
         if self.last_upload_count > 1900: # if we upload a lot of stats last time, maybe we have more to upload.
             reactor.callLater(36, self._upload_statistics)  # give the system a few seconds to chill
+
+    def combine_stats(self, names, resolution, start, end):
+        if not is_number(resolution):
+            raise ValueError("resolution should be number, but {} is given".format(type(resolution)))
+        if not is_number(start):
+            raise ValueError("start should be number, but {} is given".format(type(start)))
+        if not is_number(end):
+            raise ValueError("end should be number, but {} is given".format(type(end)))
+        if isinstance(names, str):
+            names = [names]
+        if not (isinstance(names, (list, tuple)) and all(isinstance(name, str) for name in names)):
+            raise ValueError("names must be a string or list/tuple of strings")
+
+        data = self._LocalDB.stats_get_range(names, start, end)
+        bm = BucketsManager()
+        bm.process(data)
+        stat = bm.stat(resolution, start, end)
+        return stat
